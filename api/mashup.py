@@ -6,6 +6,7 @@ import re
 import zipfile
 import base64
 import requests
+from http.server import BaseHTTPRequestHandler
 from yt_dlp import YoutubeDL
 from pydub import AudioSegment
 
@@ -215,58 +216,57 @@ def create_mashup(singer, num_videos, duration, email):
             pass
 
 
-def handler(request):
+class handler(BaseHTTPRequestHandler):
     """Vercel serverless function handler"""
     
-    # Set CORS headers
-    headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    }
+    def _send_cors_headers(self):
+        """Send CORS headers"""
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
     
-    # Handle OPTIONS request (CORS preflight)
-    if request.method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': ''
+    def do_OPTIONS(self):
+        """Handle OPTIONS request (CORS preflight)"""
+        self.send_response(200)
+        self._send_cors_headers()
+        self.end_headers()
+    
+    def do_GET(self):
+        """Handle GET request"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self._send_cors_headers()
+        self.end_headers()
+        response = {
+            'message': 'Mashup API - Use POST method with JSON data',
+            'status': 'running'
         }
+        self.wfile.write(json.dumps(response).encode())
     
-    # Handle GET request
-    if request.method == 'GET':
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps({
-                'message': 'Mashup API - Use POST method with JSON data'
-            })
-        }
-    
-    # Handle POST request
-    if request.method == 'POST':
+    def do_POST(self):
+        """Handle POST request"""
         try:
             # Parse request body
-            if hasattr(request, 'body'):
-                body = request.body
-                if isinstance(body, bytes):
-                    body = body.decode('utf-8')
-                data = json.loads(body)
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode('utf-8'))
             else:
-                data = request.json if hasattr(request, 'json') else {}
+                data = {}
             
             # Validate inputs
             errors = validate_inputs(data)
             if errors:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({
-                        'success': False,
-                        'error': '; '.join(errors)
-                    })
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self._send_cors_headers()
+                self.end_headers()
+                response = {
+                    'success': False,
+                    'error': '; '.join(errors)
                 }
+                self.wfile.write(json.dumps(response).encode())
+                return
             
             # Extract data
             singer = data['singer'].strip()
@@ -278,31 +278,24 @@ def handler(request):
             create_mashup(singer, num_videos, duration, email)
             
             # Success response
-            return {
-                'statusCode': 200,
-                'headers': headers,
-                'body': json.dumps({
-                    'success': True,
-                    'message': f'Mashup created and sent to {email}'
-                })
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self._send_cors_headers()
+            self.end_headers()
+            response = {
+                'success': True,
+                'message': f'Mashup created and sent to {email}'
             }
+            self.wfile.write(json.dumps(response).encode())
         
         except Exception as e:
             # Error response
-            return {
-                'statusCode': 500,
-                'headers': headers,
-                'body': json.dumps({
-                    'success': False,
-                    'error': str(e)
-                })
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self._send_cors_headers()
+            self.end_headers()
+            response = {
+                'success': False,
+                'error': str(e)
             }
-    
-    # Method not allowed
-    return {
-        'statusCode': 405,
-        'headers': headers,
-        'body': json.dumps({
-            'error': 'Method not allowed'
-        })
-    }
+            self.wfile.write(json.dumps(response).encode())
