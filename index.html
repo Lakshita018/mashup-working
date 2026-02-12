@@ -399,9 +399,10 @@
                         name="numVideos" 
                         required 
                         min="11" 
-                        placeholder="Must be greater than 10"
+                        max="15"
+                        placeholder="Recommended: 11-15"
                     >
-                    <div class="info-text">Minimum: 11 videos</div>
+                    <div class="info-text">⚠️ Start with 11-12 videos (free tier may timeout with more)</div>
                     <div class="error" id="numVideosError">Number must be greater than 10</div>
                 </div>
 
@@ -413,9 +414,10 @@
                         name="duration" 
                         required 
                         min="21" 
-                        placeholder="Must be greater than 20"
+                        max="30"
+                        placeholder="Recommended: 21-25"
                     >
-                    <div class="info-text">Minimum: 21 seconds</div>
+                    <div class="info-text">⚠️ Keep duration short (21-25 sec) to avoid timeout</div>
                     <div class="error" id="durationError">Duration must be greater than 20 seconds</div>
                 </div>
 

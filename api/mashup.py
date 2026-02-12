@@ -55,7 +55,7 @@ def download_and_convert(singer, num_videos, temp_dir):
     downloads_dir = os.path.join(temp_dir, 'downloads')
     os.makedirs(downloads_dir, exist_ok=True)
     
-    search_query = f"ytsearch{num_videos}:{singer} official video"
+    search_query = f"ytsearch{num_videos}:{singer}"
     
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -63,16 +63,24 @@ def download_and_convert(singer, num_videos, temp_dir):
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '192',
+            'preferredquality': '128',  # Lower quality for faster processing
         }],
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
         'ignoreerrors': True,
         'noplaylist': True,
+        'max_downloads': num_videos,
+        'socket_timeout': 30,
+        'retries': 2,
     }
     
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download([search_query])
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(search_query, download=True)
+            if not info:
+                raise Exception(f"Could not find videos for '{singer}'")
+    except Exception as e:
+        raise Exception(f"Download failed: {str(e)}")
     
     return downloads_dir
 
@@ -191,6 +199,9 @@ def create_mashup(singer, num_videos, duration, email):
     temp_dir = tempfile.mkdtemp()
     
     try:
+        # Note: Vercel free tier has 10-second timeout
+        # Pro tier has 60 seconds - may need upgrade for larger requests
+        
         # Download videos
         downloads_dir = download_and_convert(singer, num_videos, temp_dir)
         
@@ -206,6 +217,10 @@ def create_mashup(singer, num_videos, duration, email):
         return True
     
     except Exception as e:
+        error_msg = str(e)
+        # Provide helpful timeout message
+        if "timeout" in error_msg.lower() or "time" in error_msg.lower():
+            raise Exception("Request timed out. Try reducing number of videos to 3-5, or upgrade to Vercel Pro for longer timeout.")
         raise e
     
     finally:
